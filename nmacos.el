@@ -14,6 +14,7 @@
 (defun nmacos-dictionary-content (dictionary entry)
   "Get content for ENTRY in DICTIONARY."
   (lookup-entry-code entry))
+(put 'nmacos :adjusts '(lookup-adjust-goto-min))
 
 (put 'nmacos 'setup 'nmacos-setup)
 (defun nmacos-setup (agent)
@@ -88,8 +89,11 @@
             (while (re-search-forward "\\([A-Z]+\\) " nil t)
               (when (member (match-string 1) '("DERIVATIVES" "ORIGIN"))
                 (replace-match "\n\n\\1 ")))
-
             (buffer-string)))
       "")))
+
+(defun lookup-adjust-goto-min (_entry)
+  "Move point to the beginning of buffer after content display."
+  (goto-char (point-min)))
 
 (provide 'nmacos)
