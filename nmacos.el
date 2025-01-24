@@ -50,38 +50,46 @@
             (setq entries (list entry))
             entries))))))
 
-(defun nmacos-format-buffer ()
-  "Format dictionary buffer with proper line breaks and spacing."
-  (goto-char (point-min))
-  ;; Format pronunciation
-  (while (re-search-forward "\\(|[^|]+|\\)" nil t)
-    (replace-match "\\1\n"))
-  ;; Format parts of speech
-  (goto-char (point-min))
-  (while (re-search-forward "\\([^|\n]\\)\\(形容詞\\|名詞\\|動詞\\)" nil t)
-    (replace-match "\\1\n\\2"))
-  ;; Format examples
-  (goto-char (point-min))
-  (while (re-search-forward "[^▸\n]\\(▸\\)" nil t)
-    (replace-match "\n\\1"))
-  ;; Format kana readings
-  (goto-char (point-min))
-  (while (re-search-forward "\\(【[^】]+】\\)" nil t)
-    (replace-match "\n\\1"))
-  ;; Format section headers
-  (goto-char (point-min))
-  (while (re-search-forward "\\([A-Z]+\\) " nil t)
-    (when (member (match-string 1) '("DERIVATIVES" "ORIGIN"))
-      (replace-match "\n\n\\1 "))))
+(put 'nmacos 'content 'nmacos-dictionary-content)
+(defun nmacos-dictionary-content (dictionary entry)
+  "Get and format content for ENTRY in DICTIONARY."
+  (let* ((word (lookup-entry-heading entry))
+         (dict-name (lookup-dictionary-name dictionary))
+         (cmd (format "osx-dictionary -d %s %s"
+                      (shell-quote-argument dict-name)
+                      (shell-quote-argument word)))
+         (raw-content (shell-command-to-string cmd)))
+    (if (string-match "from: [^\n]+\n+\\(\\(.\\|\n\\)*\\)\\'" raw-content)
+        (let ((formatted-content (match-string 1 raw-content)))
+          (with-temp-buffer
+            (insert formatted-content)
+            (goto-char (point-min))
 
-(defun nmacos-arrange-formatting (_entry)
-  "Arrange formatting for dictionary entries."
-  (font-lock-add-keywords
-   nil
-   '(("^\\(形容詞\\|名詞\\|動詞\\)" . font-lock-keyword-face)
-     ("\\(|[^|]+|\\)" . font-lock-string-face)
-     ("\\(【[^】]+】\\)" . font-lock-constant-face)
-     ("^[A-Z]+" . font-lock-builtin-face)
-     ("((!.*?))" . font-lock-comment-face))))
+            ;; Remove extra whitespace
+            (while (re-search-forward "^[ \t\r\n]+" nil t)
+              (replace-match ""))
+
+            ;; Add line breaks for better readability
+            (goto-char (point-min))
+            (while (re-search-forward "\\(|[^|]+|\\)" nil t)
+              (replace-match "\\1\n"))
+            (goto-char (point-min))
+            (while (re-search-forward "\\([^|\n]\\)\\(形容詞\\|名詞\\|動詞\\)" nil t)
+              (replace-match "\\1\n\\2"))
+            (goto-char (point-min))
+            (while (re-search-forward "[^▸\n]\\(▸\\)" nil t)
+              (replace-match "\n\\1"))
+            (goto-char (point-min))
+            (while (re-search-forward "\\(【[^】]+】\\)" nil t)
+              (replace-match "\n\\1"))
+
+            ;; Add blank lines for major sections
+            (goto-char (point-min))
+            (while (re-search-forward "\\([A-Z]+\\) " nil t)
+              (when (member (match-string 1) '("DERIVATIVES" "ORIGIN"))
+                (replace-match "\n\n\\1 ")))
+
+            (buffer-string)))
+      "")))
 
 (provide 'nmacos)
